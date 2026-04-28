@@ -264,3 +264,5 @@ $RECYCLE.BIN/
 data/
 *.pkl
 
+# Notebooks
+demo.ipynb

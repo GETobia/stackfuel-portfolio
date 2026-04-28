@@ -5,20 +5,23 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-ROWS = 28
-COLUMNS = 28
+_ROWS = 28
+_COLUMNS = 28
 
 _BLACK_UPPER_BOUND = 15
-_WHITE_LOWER_BOUND = 240
+_WHITE_LOWER_BOUND = 245
 
 _cat_columns = ["letter", "number", "augmentation"]
+
+_accepted_image_extensions = ["jpg", "jpeg", "png"]
+_filename_regex_pattern = r"^[a-z]{1}1[.]JPG[0-9]{1,2}[a-z]{3}$"
 
 
 def _filename_data(filename):
     """
     Split filename of image from the braille dataset into its relevant parts.
     Args:
-        filename (str): Expects to match r'[a-z]{1}1[.]JPG[0-9]{1,2}[a-z]{3}[.]jpg' like 'a1.JPG3rot.jpg'
+        filename (str): Expects to match the filename regex pattern with an accepted extension, like 'a1.JPG3rot.jpg'
 
     Returns:
         List of letter, number, augmentation
@@ -41,21 +44,37 @@ def _greyscale_pixels(filepath):
     return list(np.asarray(img.getdata(), dtype=np.uint8))
 
 
+def _is_brailleimage_filename(filename):
+    """
+    Check if filename can be processed into image data.
+    Args:
+        filename (str): includes .extension.
+    Returns:
+        Boolean, True iff filename can be processed.
+    """
+    name, ext = os.path.splitext(filename)
+    pattern = re.compile(_filename_regex_pattern)
+
+    return pattern.match(name) and ext in _accepted_image_extensions
+
+
 def braille_image_data(filepath):
-    """Combine _greyscale_pixels and _filename_data"""
+    """Combine _greyscale_pixels and _filename_data."""
     filename = filepath.split("/")[-1]
     return [*_greyscale_pixels(filepath), *_filename_data(filename)]
 
 
 def braille_images_dataframe(folderpath):
-    """Create dataframe for all files in folderpath"""
+    """Create dataframe for all files in folderpath."""
     filenames = sorted(os.listdir(folderpath))
     columns = pd.Index(
-        [*[i for i in range(ROWS * COLUMNS)], *_cat_columns],
+        [*[i for i in range(_ROWS * _COLUMNS)], *_cat_columns],
         dtype="object",
     )
     data = [
-        braille_image_data(os.path.join(folderpath, filename)) for filename in filenames
+        braille_image_data(os.path.join(folderpath, filename))
+        for filename in filenames
+        if _is_brailleimage_filename(filename)
     ]
 
     return pd.DataFrame(data, columns=columns)
@@ -63,14 +82,14 @@ def braille_images_dataframe(folderpath):
 
 def seriestoimage(series):
     """
-    Pillow Image corresponding to reshaped array from pandas Series.
+    Get Pillow Image corresponding to reshaped array from pandas Series.
     Args:
         series (pandas Series object, uint8): Must have its numerical entries in first ROWS*COLUMNS indices.
     Returns:
         Pillow Image made out of the reshaped series values, ROWS rows and COLUMNS columns.
     """
     return Image.fromarray(
-        np.array(series[: ROWS * COLUMNS], dtype="uint8").reshape(ROWS, COLUMNS)
+        np.array(series[: _ROWS * _COLUMNS], dtype="uint8").reshape(_ROWS, _COLUMNS)
     )
 
 
@@ -84,7 +103,7 @@ def read_cleaned(filepath):
     df = pd.read_csv(filepath)
 
     dtypes = {
-        **{str(i): "uint8" for i in range(ROWS * COLUMNS)},
+        **{str(i): "uint8" for i in range(_ROWS * _COLUMNS)},
         **{cat: "category" for cat in _cat_columns},
     }
     return df.astype(dtypes)
