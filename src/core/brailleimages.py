@@ -8,9 +8,6 @@ from PIL import Image
 _ROWS = 28
 _COLUMNS = 28
 
-_BLACK_UPPER_BOUND = 15
-_WHITE_LOWER_BOUND = 245
-
 _cat_columns = ["letter", "number", "augmentation"]
 
 _accepted_image_extensions = ["jpg", "jpeg", "png"]
