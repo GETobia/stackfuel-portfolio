@@ -1,12 +1,12 @@
 [project]
-name = "dpp-template"
+name = "stackfuel-portfolio-braille"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "ipykernel>=7.0.1",
-    "kagglehub>=0.3.13",
+    "kagglehub>=1.0.0",
     "matplotlib>=3.10.7",
     "pandas>=2.3.3",
     "seaborn>=0.13.2",
