@@ -3,14 +3,16 @@ import re
 
 import numpy as np
 import pandas as pd
-from PIL import Image
+from skimage.feature import hog
+from skimage.io import imread
+from sklearn.base import BaseEstimator, TransformerMixin
 
 _ROWS = 28
 _COLUMNS = 28
 
 _cat_columns = ["letter", "number", "augmentation"]
 
-_accepted_image_extensions = ["jpg", "jpeg", "png"]
+_accepted_image_extensions = [".jpg", ".jpeg", ".png"]
 _filename_regex_pattern = r"^[a-z]{1}1[.]JPG[0-9]{1,2}[a-z]{3}$"
 
 
@@ -30,15 +32,15 @@ def _filename_data(filename):
 
 def _greyscale_pixels(filepath):
     """
-    List greyscale pixel data of ROWSxCOLUMNS image.
+    Greyscale pixel data of ROWSxCOLUMNS image.
     Args:
         filepath (str): Location of the image.
 
     Returns:
-        List of greyscale pixel values.
+        ndarray of greyscale pixel values.
     """
-    img = Image.open(filepath).convert("L")
-    return list(np.asarray(img.getdata(), dtype=np.uint8))
+    img = imread(filepath, as_gray=True)
+    return np.reshape(img, _ROWS * _COLUMNS)
 
 
 def _is_brailleimage_filename(filename):
@@ -62,7 +64,12 @@ def braille_image_data(filepath):
 
 
 def braille_images_dataframe(folderpath):
-    """Create dataframe for all files in folderpath."""
+    """Create dataframe for all files in folderpath.
+    Args:
+        folderpath (str): Path to braille images folder.
+    Returns:
+        pandas DataFrame with braille image data.
+    """
     filenames = sorted(os.listdir(folderpath))
     columns = pd.Index(
         [*[i for i in range(_ROWS * _COLUMNS)], *_cat_columns],
@@ -79,14 +86,14 @@ def braille_images_dataframe(folderpath):
 
 def seriestoimage(series):
     """
-    Get Pillow Image corresponding to reshaped array from pandas Series.
+    Get ROWSxCOLUMNS matrix numpy array corresponding to reshaped array from pandas Series.
     Args:
-        series (pandas Series object, uint8): Must have its numerical entries in first ROWS*COLUMNS indices.
+        series (pandas Series object): Must have its numerical entries in first ROWS*COLUMNS indices.
     Returns:
-        Pillow Image made out of the reshaped series values, ROWS rows and COLUMNS columns.
+        Array made out of the reshaped series values, ROWS rows and COLUMNS columns.
     """
-    return Image.fromarray(
-        np.array(series[: _ROWS * _COLUMNS], dtype="uint8").reshape(_ROWS, _COLUMNS)
+    return np.array(series[: _ROWS * _COLUMNS], dtype=np.float64).reshape(
+        _ROWS, _COLUMNS
     )
 
 
@@ -100,7 +107,56 @@ def read_cleaned(filepath):
     df = pd.read_csv(filepath)
 
     dtypes = {
-        **{str(i): "uint8" for i in range(_ROWS * _COLUMNS)},
         **{cat: "category" for cat in _cat_columns},
     }
     return df.astype(dtypes)
+
+
+class HOGifyer(BaseEstimator, TransformerMixin):
+    """HOG transformer for all rowsxcolumns images in DataFrame"""
+
+    rows = _ROWS
+    columns = _COLUMNS
+
+    def __init__(
+        self,
+        y=None,
+        orientations=9,
+        pixels_per_cell=(8, 8),
+        cells_per_block=(3, 3),
+        block_norm="L2-Hys",
+        transform_sqrt=False,
+        feature_vector=True,
+        channel_axis=None,
+    ):
+        self.y = y
+        self.orientations = orientations
+        self.pixels_per_cell = pixels_per_cell
+        self.cells_per_block = cells_per_block
+        self.block_norm = block_norm
+        self.visualize = False
+        self.transform_sqrt = transform_sqrt
+        self.feature_vector = feature_vector
+        self.channel_axis = channel_axis
+
+    def _hogify(self, img):
+        return hog(
+            image=img,
+            orientations=self.orientations,
+            pixels_per_cell=self.pixels_per_cell,
+            cells_per_block=self.cells_per_block,
+            block_norm=self.block_norm,
+            visualize=self.visualize,
+            transform_sqrt=self.transform_sqrt,
+            feature_vector=self.feature_vector,
+            channel_axis=self.channel_axis,
+        )
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X = np.array(X)
+        arr_imgs = np.array([x.reshape(self.rows, self.columns) for x in X])
+
+        return np.array([self._hogify(x) for x in arr_imgs])
