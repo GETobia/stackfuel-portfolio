@@ -265,4 +265,8 @@ data/
 *.pkl
 
 # Notebooks
-demo.ipynb
+demo/
+
+
+docs/
+*.png
