@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 from skimage.feature import hog
+from skimage.filters import gaussian, sato, sobel
 from skimage.io import imread
 from sklearn.base import BaseEstimator, TransformerMixin
 
@@ -112,7 +113,7 @@ def read_cleaned(filepath):
     return df.astype(dtypes)
 
 
-class HOGifyer(BaseEstimator, TransformerMixin):
+class HOGTransformer(BaseEstimator, TransformerMixin):
     """HOG transformer for all rowsxcolumns images in DataFrame"""
 
     rows = _ROWS
@@ -160,3 +161,107 @@ class HOGifyer(BaseEstimator, TransformerMixin):
         arr_imgs = np.array([x.reshape(self.rows, self.columns) for x in X])
 
         return np.array([self._hogify(x) for x in arr_imgs])
+
+
+class GaussianTransformer(BaseEstimator, TransformerMixin):
+    rows = _ROWS
+    columns = _COLUMNS
+
+    def __init__(
+        self,
+        sigma=1.0,
+        mode="nearest",
+        cval=0,
+        preserve_range=False,
+        truncate=4.0,
+        channel_axis=None,
+        out=None,
+    ):
+        self.sigma = sigma
+        self.mode = mode
+        self.cval = cval
+        self.preserve_range = preserve_range
+        self.truncate = truncate
+        self.channel_axis = channel_axis
+        self.out = out
+
+    def fit(self, X, y=None):
+        return self
+
+    def _gaussify(self, img):
+        return gaussian(
+            image=img,
+            sigma=self.sigma,
+            mode=self.mode,
+            cval=self.cval,
+            preserve_range=self.preserve_range,
+            truncate=self.truncate,
+            channel_axis=self.channel_axis,
+            out=self.out,
+        )
+
+    def transform(self, X, y=None):
+        X = np.array(X)
+        arr_imgs = np.array([x.reshape(self.rows, self.columns) for x in X])
+
+        return np.array([self._gaussify(x).flatten() for x in arr_imgs])
+
+
+class SobelTransformer(BaseEstimator, TransformerMixin):
+    """Sobel-filtered array"""
+
+    rows = _ROWS
+    columns = _COLUMNS
+
+    def __init__(self, mask=None, *, axis=None, mode="reflect", cval=0.0):
+        self.mask = mask
+        self.axis = axis
+        self.mode = mode
+        self.cval = cval
+
+    def _sobelify(self, img):
+        return sobel(
+            image=img, mask=self.mask, axis=self.axis, mode=self.mode, cval=self.cval
+        )
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X = np.array(X)
+        arr_imgs = np.array([x.reshape(self.rows, self.columns) for x in X])
+
+        return np.array([self._sobelify(x).flatten() for x in arr_imgs])
+
+
+class SatoTransformer(BaseEstimator, TransformerMixin):
+    """Sato-filtered array"""
+
+    rows = _ROWS
+    columns = _COLUMNS
+
+    def __init__(
+        self, sigmas=range(1, 10, 2), black_ridges=True, mode="reflect", cval=0
+    ):
+        self.sigmas = sigmas
+        self.black_ridges = black_ridges
+        self.mode = mode
+        self.cval = cval
+
+    def _satoify(self, img):
+        return sato(
+            image=img,
+            sigmas=self.sigmas,
+            black_ridges=self.black_ridges,
+            mode=self.mode,
+            cval=self.cval,
+        )
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X = np.array(X)
+        arr_imgs = np.array([x.reshape(self.rows, self.columns) for x in X])
+
+        return np.array([self._satoify(x).flatten() for x in arr_imgs])
